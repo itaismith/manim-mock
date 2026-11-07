@@ -47,6 +47,14 @@ class Rotating(Animation):
         for sm1, sm2 in pairs:
             for key in sm1.pointlike_data_keys:
                 sm1.data[key] = sm2.data[key]
+        # Groups without points carry gradient endpoints too
+        for sm1, sm2 in self.get_all_families_zipped():
+            for key in sm1.pointlike_uniform_keys:
+                if key in sm2.uniforms:
+                    sm1.uniforms[key] = sm2.uniforms[key]
+        # Points were written directly, so a box cached since the last frame is stale,
+        # and about_edge would otherwise pick its pivot from it
+        self.mobject.refresh_bounding_box(recurse_down=True)
         self.mobject.rotate(
             self.rate_func(self.time_spanned_alpha(alpha)) * self.angle,
             axis=self.axis,
