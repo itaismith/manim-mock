@@ -271,14 +271,19 @@ class CoordinateSystem(ABC):
                 xs = sorted_xs.copy()
                 ep = 1e-6
                 x_min, x_max = sorted_xs[0], sorted_xs[-1]
-                for d in np.ravel(get_discontinuities()):
-                    if not (x_min + ep < d < x_max - ep):
-                        continue
+                ds = np.unique([d for d in get_discontinuities() if x_min + ep < d < x_max - ep])
+                next_free = 1
+                for d in ds:
                     # Move the interior pair of samples around d to either side of it,
                     # rather than inserting new ones, so the point count never changes
-                    # (animations of the graph rely on that) and the ends stay put
-                    i = np.clip(np.searchsorted(sorted_xs, d) - 1, 1, len(xs) - 3)
+                    # (animations of the graph rely on that) and the ends stay put.
+                    # Jumps sharing a sample interval take the next free pair
+                    i = np.searchsorted(sorted_xs, d) - 1
+                    i = max(min(i, len(xs) - 3), next_free)
+                    if i > len(xs) - 3:
+                        break
                     xs[i:i + 2] = (d - ep, d + ep)
+                    next_free = i + 2
                 xs.sort()
             return self.c2p(xs, func(xs))
 
