@@ -1130,8 +1130,14 @@ class VMobject(Mobject):
         if area > 0:
             normal = area_vect / area
         else:
-            p = self.get_points()
-            normal = get_unit_normal(p[1] - p[0], p[2] - p[1])
+            # Skip null curves, such as the padding get_subcurve leaves at either end,
+            # since a zero step says nothing about which way the path faces
+            steps = np.diff(self.get_points(), axis=0)
+            steps = steps[np.any(steps != 0, axis=1)]
+            if len(steps) == 0:
+                normal = OUT
+            else:
+                normal = get_unit_normal(steps[0], steps[min(1, len(steps) - 1)])
         # Rounded, adding zero to leave no negative one of it, so that mobjects facing
         # the same way say so exactly rather than to within whatever noise their own
         # points worked out to. Six digits is finer than any shading can show.
