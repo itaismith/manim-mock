@@ -125,6 +125,7 @@ class Scene(object):
         self.original_skipping_status: bool = self.skip_animations
         self.undo_stack = []
         self.redo_stack = []
+        self.mouse_press_state: SceneState | None = None
 
         if self.start_at_animation_number is not None:
             self.skip_animations = True
@@ -662,8 +663,9 @@ class Scene(object):
     def restore_state(self, scene_state: SceneState):
         scene_state.restore_scene(self)
 
-    def save_state(self) -> None:
-        state = self.get_state()
+    def save_state(self, state: SceneState | None = None) -> None:
+        if state is None:
+            state = self.get_state()
         if self.undo_stack and state.mobjects_match(self.undo_stack[-1]):
             return
         self.redo_stack = []
@@ -776,7 +778,7 @@ class Scene(object):
         button: int,
         mods: int
     ) -> None:
-        self.save_state()
+        self.mouse_press_state = self.get_state()
         self.mouse_drag_point.move_to(point)
         event_data = {"point": point, "button": button, "mods": mods}
         propagate_event = self.dispatch_mouse_event(EventType.MousePressEvent, **event_data)
@@ -791,6 +793,10 @@ class Scene(object):
     ) -> None:
         event_data = {"point": point, "button": button, "mods": mods}
         propagate_event = self.dispatch_mouse_event(EventType.MouseReleaseEvent, **event_data)
+        state = getattr(self, "mouse_press_state", None)
+        if state is not None and not state.matches_scene(self):
+            self.save_state(state)
+        self.mouse_press_state = None
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -913,6 +919,12 @@ class SceneState():
 
     def mobjects_match(self, state: SceneState):
         return self.mobjects_to_copies == state.mobjects_to_copies
+
+    def matches_scene(self, scene: Scene) -> bool:
+        return (
+            list(self.mobjects_to_copies) == scene.mobjects
+            and all(self.looks_identical(mob, mob_copy) for mob, mob_copy in self.mobjects_to_copies.items())
+        )
 
     @staticmethod
     def looks_identical(mob: Mobject, mob_copy: Mobject) -> bool:
