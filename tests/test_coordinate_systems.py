@@ -106,7 +106,7 @@ class CoordinateSystemTests(unittest.TestCase):
         def func(x):
             return np.sign(x + 1) + np.sign(x - 1)
 
-        axes, graph = self._bound_step_graph(lambda: [np.array([-1.0, 1.0])], func)
+        axes, graph = self._bound_step_graph(lambda: [np.array([-1.0, 1.0]), np.array([[1.0]])], func)
         xs, ys = axes.p2c(graph.get_anchors())
         jumps = np.where(np.abs(np.diff(ys)) > 0.5)[0]
         np.testing.assert_allclose(xs[jumps], [-1.0, 1.0], atol=1e-5)
