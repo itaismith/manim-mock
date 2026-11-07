@@ -40,13 +40,15 @@ class Rotating(Animation):
         )
 
     def interpolate_mobject(self, alpha: float) -> None:
-        pairs = zip(
-            self.mobject.family_members_with_points(),
-            self.starting_mobject.family_members_with_points(),
-        )
-        for sm1, sm2 in pairs:
-            for key in sm1.pointlike_data_keys:
-                sm1.data[key] = sm2.data[key]
+        for sm1, sm2 in self.get_all_families_zipped():
+            if sm1.has_points():
+                for key in sm1.pointlike_data_keys:
+                    sm1.data[key] = sm2.data[key]
+            for key in sm1.pointlike_uniform_keys:
+                sm1.uniforms[key] = sm2.uniforms[key]
+        # Points were written directly, so a box cached since the last frame is stale,
+        # and about_edge would otherwise pick its pivot from it
+        self.mobject.refresh_bounding_box(recurse_down=True)
         self.mobject.rotate(
             self.rate_func(self.time_spanned_alpha(alpha)) * self.angle,
             axis=self.axis,
