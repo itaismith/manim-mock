@@ -284,8 +284,13 @@ class LinearNumberSlider(ControlMobject):
             return self.max_value
         if self.step is None:
             return float(np.clip(value, self.min_value, self.max_value))
-        no_of_steps = np.floor((value - self.min_value) / self.step + 0.5)
-        return float(np.clip(self.min_value + no_of_steps * self.step, self.min_value, self.max_value))
+        no_of_steps = int(np.floor((value - self.min_value) / self.step + 0.5))
+        snapped_value = float(np.clip(self.min_value + no_of_steps * self.step, self.min_value, self.max_value))
+        current_value = float(self.value[0])
+        tolerance = np.finfo(float).eps * max(abs(self.min_value), abs(self.max_value), self.max_value - self.min_value)
+        if np.isclose(snapped_value, current_value, rtol=0, atol=tolerance):
+            return current_value
+        return snapped_value
 
 
 class ParameterSlider(LinearNumberSlider):

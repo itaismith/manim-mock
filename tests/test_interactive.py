@@ -132,6 +132,11 @@ class ParameterSliderTests(unittest.TestCase):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 LinearNumberSlider(**kwargs)
 
+    def test_tiny_slider_steps_are_not_treated_as_roundoff(self):
+        slider = LinearNumberSlider(min_value=-1e-9, max_value=1e-9, step=1e-12)
+        point = slider.slider_axis.point_from_proportion(0.5005)
+        self.assertAlmostEqual(slider.get_value_from_point(point), 1e-12, delta=1e-23)
+
     def make_scene(self, slider, scene_type=Scene):
         scene = scene_type.__new__(scene_type)
         scene.frame = CameraFrame().scale(0.8).reorient(25, 40).shift(RIGHT)
@@ -209,7 +214,7 @@ class ParameterSliderTests(unittest.TestCase):
         self.assertEqual(slider.get_value(), 1)
 
     def test_no_op_slider_click_preserves_redo(self):
-        slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
+        slider = ParameterSlider("cut", min_value=-1.2, max_value=1.2, step=0.1, value=0)
         scene = self.make_scene(slider)
         end = scene.frame.from_fixed_frame_point(slider.slider_axis.get_end())
         middle = scene.frame.from_fixed_frame_point(slider.slider_axis.get_center())
@@ -219,9 +224,10 @@ class ParameterSliderTests(unittest.TestCase):
         slider.update()
         scene.on_mouse_press(middle, 1, 0)
         scene.on_mouse_release(middle, 1, 0)
+        self.assertEqual(slider.get_value(), 0)
         scene.redo()
         slider.update()
-        self.assertEqual(slider.get_value(), 1)
+        self.assertEqual(slider.get_value(), slider.max_value)
 
     def test_ignored_interactive_overlays_do_not_clear_redo(self):
         slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
