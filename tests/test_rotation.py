@@ -32,3 +32,14 @@ def test_rotating_does_not_compound_gradient_rotation():
     play_through(Rotating(square, PI / 2, about_point=ORIGIN, run_time=1), False)
     for key in square.pointlike_uniform_keys:
         np.testing.assert_allclose(square.uniforms[key], expected.uniforms[key], atol=1e-6)
+
+
+def test_rotating_survives_removing_an_empty_child():
+    from manimlib.mobject.types.vectorized_mobject import VGroup
+    empty = VGroup()
+    group = VGroup(empty, Square(), Square().shift(RIGHT))
+    animation = Rotating(group, PI / 2, about_point=ORIGIN, run_time=1)
+    animation.begin()
+    animation.interpolate(0.25)
+    group.remove(empty)
+    animation.interpolate(0.5)
