@@ -484,6 +484,8 @@ class InteractiveScene(Scene):
             char = chr(symbol)
         except OverflowError:
             return
+        if char == "z" and (modifiers & Mods.CTRL_OR_CMD):
+            return
         if char == SELECT_KEY and not (modifiers & Mods.ANY):
             self.enable_selection()
         if char == UNSELECT_KEY:
@@ -618,7 +620,7 @@ class InteractiveScene(Scene):
         self,
         point: Vect3,
         d_point: Vect3,
-        buttons: int,
+        buttons: list[int],
         modifiers: int
     ) -> None:
         super().on_mouse_drag(point, d_point, buttons, modifiers)

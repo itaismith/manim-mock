@@ -26,6 +26,7 @@ from manimlib.mobject.mobject import Mobject
 from manimlib.mobject.mobject import Point
 from manimlib.mobject.types.vectorized_mobject import VGroup
 from manimlib.mobject.types.vectorized_mobject import VMobject
+from manimlib.mobject.value_tracker import ValueTracker
 from manimlib.scene.scene_embed import InteractiveSceneEmbed
 from manimlib.scene.scene_embed import CheckpointManager
 from manimlib.scene.scene_file_writer import SceneFileWriter
@@ -124,6 +125,7 @@ class Scene(object):
         self.original_skipping_status: bool = self.skip_animations
         self.undo_stack = []
         self.redo_stack = []
+        self.mouse_press_state: SceneState | None = None
 
         if self.start_at_animation_number is not None:
             self.skip_animations = True
@@ -661,8 +663,9 @@ class Scene(object):
     def restore_state(self, scene_state: SceneState):
         scene_state.restore_scene(self)
 
-    def save_state(self) -> None:
-        state = self.get_state()
+    def save_state(self, state: SceneState | None = None) -> None:
+        if state is None:
+            state = self.get_state()
         if self.undo_stack and state.mobjects_match(self.undo_stack[-1]):
             return
         self.redo_stack = []
@@ -739,7 +742,7 @@ class Scene(object):
         self.mouse_point.move_to(point)
 
         event_data = {"point": point, "d_point": d_point}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseMotionEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseMotionEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -758,17 +761,16 @@ class Scene(object):
         self,
         point: Vect3,
         d_point: Vect3,
-        buttons: int,
+        buttons: list[int],
         modifiers: int
     ) -> None:
         self.mouse_drag_point.move_to(point)
-        if self.drag_to_pan:
-            self.frame.shift(-d_point)
-
         event_data = {"point": point, "d_point": d_point, "buttons": buttons, "modifiers": modifiers}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseDragEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseDragEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
+        if self.drag_to_pan:
+            self.frame.shift(-d_point)
 
     def on_mouse_press(
         self,
@@ -776,9 +778,10 @@ class Scene(object):
         button: int,
         mods: int
     ) -> None:
+        self.mouse_press_state = self.get_state()
         self.mouse_drag_point.move_to(point)
         event_data = {"point": point, "button": button, "mods": mods}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MousePressEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MousePressEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -789,7 +792,11 @@ class Scene(object):
         mods: int
     ) -> None:
         event_data = {"point": point, "button": button, "mods": mods}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseReleaseEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseReleaseEvent, **event_data)
+        state = getattr(self, "mouse_press_state", None)
+        if state is not None and not state.matches_scene(self):
+            self.save_state(state)
+        self.mouse_press_state = None
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -801,7 +808,7 @@ class Scene(object):
         y_pixel_offset: float
     ) -> None:
         event_data = {"point": point, "offset": offset}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseScrollEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseScrollEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -811,6 +818,12 @@ class Scene(object):
         self.frame.scale(
             1 - self.scroll_sensitivity * rel_offset,
             about_point=point
+        )
+
+    def dispatch_mouse_event(self, event_type: EventType, **event_data):
+        return EVENT_DISPATCHER.dispatch(
+            event_type, frame=self.frame,
+            mobjects=self.get_mobject_family_members(), **event_data,
         )
 
     def on_key_release(
@@ -842,9 +855,10 @@ class Scene(object):
         if char == manim_config.key_bindings.reset:
             self.play(self.camera.frame.animate.to_default_state())
         elif char == "z" and (modifiers & Mods.CTRL_OR_CMD):
-            self.undo()
-        elif char == "z" and (modifiers & (Mods.CTRL_OR_CMD | Mods.SHIFT)):
-            self.redo()
+            if modifiers & Mods.SHIFT:
+                self.redo()
+            else:
+                self.undo()
         # command + q
         elif char == manim_config.key_bindings.quit and (modifiers & Mods.CTRL_OR_CMD):
             self.quit_interaction = True
@@ -882,16 +896,14 @@ class SceneState():
     def __init__(self, scene: Scene, ignore: list[Mobject] | None = None):
         self.time = scene.time
         self.num_plays = scene.num_plays
-        self.mobjects_to_copies = OrderedDict.fromkeys(scene.mobjects)
-        if ignore:
-            for mob in ignore:
-                self.mobjects_to_copies.pop(mob, None)
-
+        self.mobjects_to_copies: OrderedDict[Mobject, Mobject] = OrderedDict()
         last_m2c = scene.undo_stack[-1].mobjects_to_copies if scene.undo_stack else dict()
-        for mob in self.mobjects_to_copies:
+        for mob in scene.mobjects:
+            if ignore and mob in ignore:
+                continue
             # If it hasn't changed since the last state, just point to the
             # same copy as before
-            if mob in last_m2c and last_m2c[mob].looks_identical(mob):
+            if mob in last_m2c and self.looks_identical(last_m2c[mob], mob):
                 self.mobjects_to_copies[mob] = last_m2c[mob]
             else:
                 self.mobjects_to_copies[mob] = mob.copy()
@@ -906,10 +918,34 @@ class SceneState():
     def mobjects_match(self, state: SceneState):
         return self.mobjects_to_copies == state.mobjects_to_copies
 
+    def matches_scene(self, scene: Scene) -> bool:
+        current_copies = scene.get_state().mobjects_to_copies
+        return (
+            list(self.mobjects_to_copies) == list(current_copies)
+            and all(
+                self.looks_identical(mob_copy, current_copies[mob])
+                for mob, mob_copy in self.mobjects_to_copies.items()
+            )
+        )
+
+    @staticmethod
+    def looks_identical(mob: Mobject, mob_copy: Mobject) -> bool:
+        family = mob.get_family()
+        copy_family = mob_copy.get_family()
+        return (
+            len(family) == len(copy_family)
+            and mob.looks_identical(mob_copy)
+            and all(
+                sm.looks_identical(sm_copy)
+                for sm, sm_copy in zip(family, copy_family)
+                if isinstance(sm, ValueTracker)
+            )
+        )
+
     def n_changes(self, state: SceneState):
         m2c = state.mobjects_to_copies
         return sum(
-            1 - int(mob in m2c and mob.looks_identical(m2c[mob]))
+            1 - int(mob in m2c and self.looks_identical(mob, m2c[mob]))
             for mob in self.mobjects_to_copies
         )
 
@@ -920,6 +956,10 @@ class SceneState():
             mob.become(mob_copy, match_updaters=True)
             for mob, mob_copy in self.mobjects_to_copies.items()
         ]
+        for mob, mob_copy in self.mobjects_to_copies.items():
+            for sm, sm_copy in zip(mob.get_family()[1:], mob_copy.get_family()[1:]):
+                if isinstance(sm, ValueTracker) and isinstance(sm_copy, ValueTracker):
+                    sm.become(sm_copy, match_updaters=True)
 
 
 class EndScene(Exception):

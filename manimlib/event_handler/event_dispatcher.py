@@ -34,7 +34,26 @@ class EventDispatcher(object):
             pass
         return self
 
-    def dispatch(self, event_type: EventType, **event_data):
+    def dispatch(self, event_type: EventType, *, frame=None, mobjects=None, **event_data):
+        visible = None if mobjects is None else set(mobjects)
+
+        def is_visible(listner):
+            return visible is None or listner.mobject in visible
+
+        def data_for(listner):
+            if frame is None or not listner.mobject.is_fixed_in_frame():
+                return event_data
+            return {
+                key: frame.to_fixed_frame_point(value, relative=(key != "point"))
+                if key in ("point", "d_point", "offset") else value
+                for key, value in event_data.items()
+            }
+
+        def is_hit(listner):
+            return is_visible(listner) and listner.mobject.is_point_touching(
+                data_for(listner).get("point", self.mouse_point), buff=1e-6,
+            )
+
         if event_type == EventType.MouseMotionEvent:
             self.mouse_point = event_data["point"]
         elif event_type == EventType.MouseDragEvent:
@@ -47,7 +66,7 @@ class EventDispatcher(object):
             self.draggable_object_listners = [
                 listner
                 for listner in self.event_listners[EventType.MouseDragEvent]
-                if listner.mobject.is_point_touching(self.mouse_point)
+                if is_hit(listner)
             ]
         elif event_type == EventType.MouseReleaseEvent:
             self.draggable_object_listners = []
@@ -57,15 +76,17 @@ class EventDispatcher(object):
         if event_type == EventType.MouseDragEvent:
             for listner in self.draggable_object_listners:
                 assert isinstance(listner, EventListener)
-                propagate_event = listner.callback(listner.mobject, event_data)
+                if not is_visible(listner):
+                    continue
+                propagate_event = listner.callback(listner.mobject, data_for(listner))
                 if propagate_event is not None and propagate_event is False:
                     return propagate_event
 
         elif event_type.value.startswith('mouse'):
             for listner in self.event_listners[event_type]:
-                if listner.mobject.is_point_touching(self.mouse_point):
+                if is_hit(listner):
                     propagate_event = listner.callback(
-                        listner.mobject, event_data)
+                        listner.mobject, data_for(listner))
                     if propagate_event is not None and propagate_event is False:
                         return propagate_event
 
