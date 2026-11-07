@@ -10,7 +10,7 @@ from manimlib.event_handler.event_dispatcher import EventDispatcher
 from manimlib.event_keys import Mods
 from manimlib.mobject.geometry import Circle
 from manimlib.mobject.interactive import LinearNumberSlider, ParameterSlider
-from manimlib.mobject.mobject import Point
+from manimlib.mobject.mobject import Group, Point
 from manimlib.mobject.value_tracker import ValueTracker
 from manimlib.scene.scene import Scene
 
@@ -57,6 +57,24 @@ class InteractiveHistoryTests(unittest.TestCase):
         self.assertEqual(tracker.get_value(), 2)
         scene.undo()
         self.assertEqual(tracker.get_value(), 1)
+
+    def test_grouped_tracker_snapshots_keep_distinct_values(self):
+        scene = Scene.__new__(Scene)
+        scene.time = scene.num_plays = 0
+        scene.undo_stack = []
+        scene.redo_stack = []
+        tracker = ValueTracker(1)
+        scene.mobjects = [Group(Group(tracker))]
+        scene.save_state()
+        tracker.set_value(2)
+        scene.save_state()
+        tracker.set_value(3)
+        scene.undo()
+        self.assertEqual(tracker.get_value(), 2)
+        scene.undo()
+        self.assertEqual(tracker.get_value(), 1)
+        scene.redo()
+        self.assertEqual(tracker.get_value(), 2)
 
 
 class ParameterSliderTests(unittest.TestCase):
@@ -130,6 +148,24 @@ class ParameterSliderTests(unittest.TestCase):
         scene.on_mouse_press(point, 1, 0)
         self.assertEqual(slider.get_value(), 0)
         self.assertEqual(EVENT_DISPATCHER.draggable_object_listners, [])
+
+    def test_grouped_slider_undo_restores_value_and_display(self):
+        slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0, step=0.1)
+        scene = self.make_scene(slider)
+        scene.mobjects = [scene.frame, Group(Group(slider))]
+        point = scene.frame.from_fixed_frame_point(slider.slider_axis.get_end())
+        scene.on_mouse_press(point, 1, 0)
+        scene.on_mouse_release(point, 1, 0)
+        self.assertEqual(slider.get_value(), 1)
+        scene.undo()
+        slider.update()
+        self.assertEqual(slider.get_value(), 0)
+        self.assertEqual(slider.readout.get_value(), 0)
+        np.testing.assert_allclose(slider.slider.get_center(), slider.slider_axis.get_center())
+        scene.redo()
+        slider.update()
+        self.assertEqual(slider.get_value(), 1)
+        self.assertEqual(slider.readout.get_value(), 1)
 
     def test_world_space_listener_is_not_transformed(self):
         dispatcher = EventDispatcher()
