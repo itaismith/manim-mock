@@ -23,6 +23,7 @@ from manimlib.utils.space_ops import cross2d
 from manimlib.utils.space_ops import compass_directions
 from manimlib.utils.space_ops import find_intersection
 from manimlib.utils.space_ops import get_norm
+from manimlib.utils.space_ops import get_unit_normal
 from manimlib.utils.space_ops import normalize
 from manimlib.utils.space_ops import rotate_vector
 from manimlib.utils.space_ops import rotation_matrix_transpose
@@ -254,9 +255,10 @@ class Arc(TipableVMobject):
         # Tangent vectors
         t1 = h - a1
         t2 = h - a2
-        # Normals
-        n1 = rotate_vector(t1, TAU / 4)
-        n2 = rotate_vector(t2, TAU / 4)
+        # Normals, within the plane of the arc
+        axis = get_unit_normal(t1, t2)
+        n1 = rotate_vector(t1, TAU / 4, axis)
+        n2 = rotate_vector(t2, TAU / 4, axis)
         return find_intersection(a1, n1, a2, n2)
 
     def get_start_angle(self) -> float:

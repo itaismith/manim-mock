@@ -327,6 +327,8 @@ def find_intersection(
         cp2 = cross(v1, v0)
         numer = np.array((cp1 * cp2).sum(d - 1))
         denom = np.array((cp2 * cp2).sum(d - 1))
+        # denom is |cp2|^2, so square the threshold to match the 2d check on |cp2|
+        threshold = threshold**2
     denom[abs(denom) < threshold] = np.inf
     ratio = numer / denom
     return p0 + (ratio * v0.T).T
