@@ -618,7 +618,7 @@ class InteractiveScene(Scene):
         self,
         point: Vect3,
         d_point: Vect3,
-        buttons: int,
+        buttons: list[int],
         modifiers: int
     ) -> None:
         super().on_mouse_drag(point, d_point, buttons, modifiers)

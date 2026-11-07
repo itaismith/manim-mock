@@ -739,7 +739,7 @@ class Scene(object):
         self.mouse_point.move_to(point)
 
         event_data = {"point": point, "d_point": d_point}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseMotionEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseMotionEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -758,17 +758,16 @@ class Scene(object):
         self,
         point: Vect3,
         d_point: Vect3,
-        buttons: int,
+        buttons: list[int],
         modifiers: int
     ) -> None:
         self.mouse_drag_point.move_to(point)
-        if self.drag_to_pan:
-            self.frame.shift(-d_point)
-
         event_data = {"point": point, "d_point": d_point, "buttons": buttons, "modifiers": modifiers}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseDragEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseDragEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
+        if self.drag_to_pan:
+            self.frame.shift(-d_point)
 
     def on_mouse_press(
         self,
@@ -776,9 +775,10 @@ class Scene(object):
         button: int,
         mods: int
     ) -> None:
+        self.save_state()
         self.mouse_drag_point.move_to(point)
         event_data = {"point": point, "button": button, "mods": mods}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MousePressEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MousePressEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -789,7 +789,7 @@ class Scene(object):
         mods: int
     ) -> None:
         event_data = {"point": point, "button": button, "mods": mods}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseReleaseEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseReleaseEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -801,7 +801,7 @@ class Scene(object):
         y_pixel_offset: float
     ) -> None:
         event_data = {"point": point, "offset": offset}
-        propagate_event = EVENT_DISPATCHER.dispatch(EventType.MouseScrollEvent, **event_data)
+        propagate_event = self.dispatch_mouse_event(EventType.MouseScrollEvent, **event_data)
         if propagate_event is not None and propagate_event is False:
             return
 
@@ -811,6 +811,12 @@ class Scene(object):
         self.frame.scale(
             1 - self.scroll_sensitivity * rel_offset,
             about_point=point
+        )
+
+    def dispatch_mouse_event(self, event_type: EventType, **event_data):
+        return EVENT_DISPATCHER.dispatch(
+            event_type, frame=self.frame,
+            mobjects=self.get_mobject_family_members(), **event_data,
         )
 
     def on_key_release(
@@ -842,9 +848,10 @@ class Scene(object):
         if char == manim_config.key_bindings.reset:
             self.play(self.camera.frame.animate.to_default_state())
         elif char == "z" and (modifiers & Mods.CTRL_OR_CMD):
-            self.undo()
-        elif char == "z" and (modifiers & (Mods.CTRL_OR_CMD | Mods.SHIFT)):
-            self.redo()
+            if modifiers & Mods.SHIFT:
+                self.redo()
+            else:
+                self.undo()
         # command + q
         elif char == manim_config.key_bindings.quit and (modifiers & Mods.CTRL_OR_CMD):
             self.quit_interaction = True

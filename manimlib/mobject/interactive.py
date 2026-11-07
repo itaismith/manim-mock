@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+from typing import cast
 
 from manimlib.constants import FRAME_HEIGHT, FRAME_WIDTH
 from manimlib.constants import DOWN, LEFT, ORIGIN, RIGHT, UP
@@ -10,6 +11,7 @@ from manimlib.event_keys import Keys
 from manimlib.event_keys import Mods
 from manimlib.mobject.mobject import Group
 from manimlib.mobject.mobject import Mobject
+from manimlib.mobject.numbers import DecimalNumber
 from manimlib.mobject.geometry import Circle
 from manimlib.mobject.geometry import Dot
 from manimlib.mobject.geometry import Line
@@ -218,7 +220,7 @@ class LinearNumberSlider(ControlMobject):
         value_type: type = np.float64,
         min_value: float = -10.0,
         max_value: float = 10.0,
-        step: float = 1.0,
+        step: float | None = 1.0,
         rounded_rect_kwargs: dict = {
             "height": 0.075,
             "width": 2,
@@ -232,6 +234,10 @@ class LinearNumberSlider(ControlMobject):
         },
         **kwargs
     ):
+        if not np.isfinite([min_value, max_value]).all() or min_value >= max_value:
+            raise ValueError("Slider bounds must be finite and increasing")
+        if step is not None and (not np.isfinite(step) or step <= 0):
+            raise ValueError("Slider step must be positive, or None for continuous values")
         self.value_type = value_type
         self.min_value = min_value
         self.max_value = max_value
@@ -251,9 +257,11 @@ class LinearNumberSlider(ControlMobject):
         self.slider.add_mouse_drag_listner(self.slider_on_mouse_drag)
 
         super().__init__(value, self.bar, self.slider, self.slider_axis, **kwargs)
+        self.set_value(value)
 
     def assert_value(self, value: float) -> None:
-        assert self.min_value <= value <= self.max_value
+        if not np.isfinite(value) or not self.min_value <= value <= self.max_value:
+            raise ValueError("Slider value must be finite and within its bounds")
 
     def set_value_anim(self, value: float) -> None:
         prop = (value - self.min_value) / (self.max_value - self.min_value)
@@ -270,9 +278,62 @@ class LinearNumberSlider(ControlMobject):
         point_on_line = get_closest_point_on_line(start, end, point)
         prop = get_norm(point_on_line - start) / get_norm(end - start)
         value = self.min_value + prop * (self.max_value - self.min_value)
-        no_of_steps = int((value - self.min_value) / self.step)
-        value_nearest_to_step = self.min_value + no_of_steps * self.step
-        return value_nearest_to_step
+        if np.isclose(prop, 0):
+            return self.min_value
+        if np.isclose(prop, 1):
+            return self.max_value
+        if self.step is None:
+            return float(np.clip(value, self.min_value, self.max_value))
+        no_of_steps = np.floor((value - self.min_value) / self.step + 0.5)
+        return float(np.clip(self.min_value + no_of_steps * self.step, self.min_value, self.max_value))
+
+
+class ParameterSlider(LinearNumberSlider):
+    """A labelled, fixed-in-frame ValueTracker controlled by clicking or dragging.
+
+    Add it to a scene and use get_value() in an updater, just like a ValueTracker.
+    Set step=None for continuous adjustment.
+    """
+
+    def __init__(self, name: str, num_decimal_places: int = 2, **kwargs):
+        super().__init__(**kwargs)
+        self.label = Text(name + " =", font_size=24)
+        self.readout = DecimalNumber(self.get_value(), num_decimal_places=num_decimal_places, font_size=24)
+        self.caption = VGroup(self.label, self.readout).arrange(RIGHT, buff=SMALL_BUFF)
+        self.caption.next_to(self.bar, UP, buff=SMALL_BUFF, aligned_edge=LEFT)
+        self.add(self.caption)
+        self.fix_in_frame()
+        self.add_mouse_press_listner(self.on_mouse_press)
+        self.add_mouse_drag_listner(self.slider_on_mouse_drag)
+        self.add_updater(lambda mob: cast(ParameterSlider, mob).refresh_display())
+
+    def get_value(self) -> float:
+        return float(self.value[0])
+
+    def on_mouse_press(self, mob, event_data) -> bool | None:
+        if event_data["button"] != 1:
+            return None
+        self.set_value(self.get_value_from_point(event_data["point"]))
+        return False
+
+    def slider_on_mouse_drag(self, mob, event_data) -> bool:
+        if 1 not in event_data["buttons"]:
+            return True
+        return super().slider_on_mouse_drag(mob, event_data)
+
+    def refresh_display(self):
+        self.set_value_anim(self.get_value())
+        if self.readout.get_value() != self.get_value():
+            self.readout.set_value(self.get_value())
+        self.readout.next_to(self.label, RIGHT, buff=SMALL_BUFF)
+        self.readout.fix_in_frame()
+        return self
+
+    def set_value(self, value: float):
+        super().set_value(value)
+        if hasattr(self, "readout"):
+            self.refresh_display()
+        return self
 
 
 class ColorSliders(Group):

@@ -67,6 +67,13 @@ class ValueTracker(Mobject):
         self.value = mobject.value.copy()
         return self
 
+    def looks_identical(self, mobject: Mobject) -> bool:
+        return (
+            isinstance(mobject, ValueTracker)
+            and np.array_equal(self.value, mobject.value)
+            and super().looks_identical(mobject)
+        )
+
 
 class ExponentialValueTracker(ValueTracker):
     """
