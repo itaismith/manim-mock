@@ -22,7 +22,8 @@ self.embed()
 Click the track or drag the knob. Values snap to the nearest step and clamp at
 the endpoints; `step=None` gives continuous adjustment. Use `cut.set_value(0)`
 from the terminal or animate it like any tracker. The readout follows restoration
-and animation. A drag saves one undo state and must not pan the camera. The control
+and animation. A changed click/drag saves one undo state on release; unchanged
+clicks preserve undo/redo history. A slider drag must not pan the camera. The control
 stays fixed and clickable after orbit/pan/zoom. Removed controls must not capture input.
 
 ## Repeatable checkpoints
@@ -61,6 +62,12 @@ stays fixed and clickable after orbit/pan/zoom. Removed controls must not captur
    purple/upper again. Repeat. On the old code the redo shortcut takes the undo
    branch and stays blue/right; direct `redo()` in the terminal isolates the
    problem to keyboard dispatch. Capture before/after GIFs of the same sequence.
+6. **Grouped controls and history:** run `remove(cut); add(Group(Group(cut)))`
+   in the terminal. Edit the slider, click empty space without dragging, then
+   undo: it must restore the pre-edit value, knob, readout and yellow clipping
+   immediately, not consume an unchanged snapshot. Click empty space again and
+   redo: the edit must return. Repeat after clicking the unchanged knob instead
+   of empty space. Repeat orbit/drag and checkpoint paste with the nested slider.
 
 Automated, display-independent companion checks: `python -m pytest tests`.
 Do not pass pytest flags: manimlib parses command-line arguments on import.
