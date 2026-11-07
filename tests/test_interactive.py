@@ -8,10 +8,11 @@ from manimlib.camera.camera_frame import CameraFrame
 from manimlib.event_handler import EVENT_DISPATCHER
 from manimlib.event_handler.event_dispatcher import EventDispatcher
 from manimlib.event_keys import Mods
-from manimlib.mobject.geometry import Circle
+from manimlib.mobject.geometry import Circle, Rectangle
 from manimlib.mobject.interactive import LinearNumberSlider, ParameterSlider
 from manimlib.mobject.mobject import Group, Point
 from manimlib.mobject.value_tracker import ValueTracker
+from manimlib.mobject.types.vectorized_mobject import VGroup
 from manimlib.scene.interactive_scene import InteractiveScene
 from manimlib.scene.scene import Scene
 
@@ -205,8 +206,8 @@ class ParameterSliderTests(unittest.TestCase):
         slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
         scene = cast(InteractiveScene, self.make_scene(slider, InteractiveScene))
         scene.selection_highlight = Group()
-        scene.selection_rectangle = Circle()
-        scene.crosshair = Point()
+        scene.selection_rectangle = Rectangle()
+        scene.crosshair = VGroup()
         scene.mobjects.insert(0, scene.selection_highlight)
         end = scene.frame.from_fixed_frame_point(slider.slider_axis.get_end())
         empty = scene.frame.from_fixed_frame_point(UP)
