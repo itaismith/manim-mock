@@ -12,6 +12,7 @@ from manimlib.mobject.geometry import Circle
 from manimlib.mobject.interactive import LinearNumberSlider, ParameterSlider
 from manimlib.mobject.mobject import Group, Point
 from manimlib.mobject.value_tracker import ValueTracker
+from manimlib.scene.interactive_scene import InteractiveScene
 from manimlib.scene.scene import Scene
 
 
@@ -109,8 +110,8 @@ class ParameterSliderTests(unittest.TestCase):
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 LinearNumberSlider(**kwargs)
 
-    def make_scene(self, slider):
-        scene = Scene.__new__(Scene)
+    def make_scene(self, slider, scene_type=Scene):
+        scene = scene_type.__new__(scene_type)
         scene.frame = CameraFrame().scale(0.8).reorient(25, 40).shift(RIGHT)
         scene.mobjects = [scene.frame, slider]
         scene.mouse_drag_point = Point()
@@ -196,6 +197,27 @@ class ParameterSliderTests(unittest.TestCase):
         slider.update()
         scene.on_mouse_press(middle, 1, 0)
         scene.on_mouse_release(middle, 1, 0)
+        scene.redo()
+        slider.update()
+        self.assertEqual(slider.get_value(), 1)
+
+    def test_ignored_interactive_overlays_do_not_clear_redo(self):
+        slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
+        scene = self.make_scene(slider, InteractiveScene)
+        scene.selection_highlight = Group()
+        scene.selection_rectangle = Circle()
+        scene.crosshair = Point()
+        scene.mobjects.insert(0, scene.selection_highlight)
+        end = scene.frame.from_fixed_frame_point(slider.slider_axis.get_end())
+        empty = scene.frame.from_fixed_frame_point(UP)
+        Scene.on_mouse_press(scene, end, 1, 0)
+        Scene.on_mouse_release(scene, end, 1, 0)
+        scene.undo()
+        slider.update()
+        self.assertEqual(slider.get_value(), 0)
+        self.assertTrue(scene.get_state().matches_scene(scene))
+        Scene.on_mouse_press(scene, empty, 1, 0)
+        Scene.on_mouse_release(scene, empty, 1, 0)
         scene.redo()
         slider.update()
         self.assertEqual(slider.get_value(), 1)

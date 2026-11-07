@@ -919,9 +919,13 @@ class SceneState():
         return self.mobjects_to_copies == state.mobjects_to_copies
 
     def matches_scene(self, scene: Scene) -> bool:
+        current_copies = scene.get_state().mobjects_to_copies
         return (
-            list(self.mobjects_to_copies) == scene.mobjects
-            and all(self.looks_identical(mob, mob_copy) for mob, mob_copy in self.mobjects_to_copies.items())
+            list(self.mobjects_to_copies) == list(current_copies)
+            and all(
+                self.looks_identical(mob_copy, current_copies[mob])
+                for mob, mob_copy in self.mobjects_to_copies.items()
+            )
         )
 
     @staticmethod
