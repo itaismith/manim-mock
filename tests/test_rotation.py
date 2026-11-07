@@ -43,3 +43,12 @@ def test_rotating_survives_removing_an_empty_child():
     animation.interpolate(0.25)
     group.remove(empty)
     animation.interpolate(0.5)
+
+
+def test_rotating_does_not_compound_group_gradient_rotation():
+    from manimlib.mobject.types.vectorized_mobject import VGroup
+    group = VGroup(Square(), Square().shift(2 * RIGHT)).set_color([BLUE, RED])
+    expected = group.copy().rotate(PI / 2, about_point=ORIGIN)
+    play_through(Rotating(group, PI / 2, about_point=ORIGIN, run_time=1), False)
+    for key in group.pointlike_uniform_keys:
+        np.testing.assert_allclose(group.uniforms[key], expected.uniforms[key], atol=1e-6)
