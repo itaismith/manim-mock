@@ -102,6 +102,15 @@ class CoordinateSystemTests(unittest.TestCase):
         xs = axes.x_axis.p2n(graph.get_points())
         np.testing.assert_allclose([xs.min(), xs.max()], [-4.0, 4.0], atol=1e-5)
 
+    def test_bound_graph_accepts_nested_discontinuities(self):
+        def func(x):
+            return np.sign(x + 1) + np.sign(x - 1)
+
+        axes, graph = self._bound_step_graph(lambda: [np.array([-1.0, 1.0])], func)
+        xs, ys = axes.p2c(graph.get_anchors())
+        jumps = np.where(np.abs(np.diff(ys)) > 0.5)[0]
+        np.testing.assert_allclose(xs[jumps], [-1.0, 1.0], atol=1e-5)
+
     def test_binding_an_empty_graph(self):
         graph = Axes().bind_graph_to_func(VMobject(), np.sin, get_discontinuities=lambda: [0.0])
         graph.update()

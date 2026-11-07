@@ -271,7 +271,8 @@ class CoordinateSystem(ABC):
                 xs = sorted_xs.copy()
                 ep = 1e-6
                 x_min, x_max = sorted_xs[0], sorted_xs[-1]
-                ds = np.unique([d for d in get_discontinuities() if x_min + ep < d < x_max - ep])
+                ds = np.hstack([[], *get_discontinuities()])
+                ds = np.unique(ds[(x_min + ep < ds) & (ds < x_max - ep)])
                 next_free = 1
                 for d in ds:
                     # Move the interior pair of samples around d to either side of it,
