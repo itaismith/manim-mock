@@ -44,6 +44,27 @@ class InteractiveHistoryTests(unittest.TestCase):
         scene.on_key_press(ord("z"), Mods.SHIFT)
         self.assertEqual(len(scene.redo_stack), 1)
 
+    def test_interactive_history_shortcuts_do_not_save_grab_state(self):
+        for command in (Mods.CTRL, Mods.CMD):
+            with self.subTest(command=command):
+                scene = InteractiveScene.__new__(InteractiveScene)
+                scene.time = scene.num_plays = 0
+                scene.undo_stack = []
+                scene.redo_stack = []
+                scene.selection_highlight = Group()
+                scene.selection_rectangle = Rectangle()
+                scene.crosshair = VGroup()
+                tracker = ValueTracker(0)
+                scene.mobjects = [tracker, scene.selection_highlight]
+                scene.save_state()
+                tracker.set_value(0.6)
+                scene.on_key_press(ord("z"), command)
+                self.assertEqual(tracker.get_value(), 0)
+                self.assertEqual(len(scene.redo_stack), 1)
+                scene.on_key_press(ord("z"), command | Mods.SHIFT)
+                self.assertEqual(tracker.get_value(), 0.6)
+                self.assertEqual(len(scene.undo_stack), 1)
+
     def test_scene_state_does_not_reuse_changed_tracker_value(self):
         scene = Scene.__new__(Scene)
         scene.time = scene.num_plays = 0

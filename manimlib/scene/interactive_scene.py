@@ -484,6 +484,8 @@ class InteractiveScene(Scene):
             char = chr(symbol)
         except OverflowError:
             return
+        if char == "z" and (modifiers & Mods.CTRL_OR_CMD):
+            return
         if char == SELECT_KEY and not (modifiers & Mods.ANY):
             self.enable_selection()
         if char == UNSELECT_KEY:
