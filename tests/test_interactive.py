@@ -1,5 +1,5 @@
 import unittest
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -203,7 +203,7 @@ class ParameterSliderTests(unittest.TestCase):
 
     def test_ignored_interactive_overlays_do_not_clear_redo(self):
         slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
-        scene = self.make_scene(slider, InteractiveScene)
+        scene = cast(InteractiveScene, self.make_scene(slider, InteractiveScene))
         scene.selection_highlight = Group()
         scene.selection_rectangle = Circle()
         scene.crosshair = Point()
