@@ -171,7 +171,7 @@ class ParameterSliderTests(unittest.TestCase):
         slider = ParameterSlider("cut", min_value=-1, max_value=1, value=0)
         scene = self.make_scene(slider)
         end = scene.frame.from_fixed_frame_point(slider.slider_axis.get_end())
-        empty = scene.frame.from_fixed_frame_point(np.array([3, 3, 0]))
+        empty = scene.frame.from_fixed_frame_point(UP)
         scene.on_mouse_press(end, 1, 0)
         scene.on_mouse_release(end, 1, 0)
         scene.on_mouse_press(empty, 1, 0)

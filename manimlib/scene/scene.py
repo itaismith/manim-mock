@@ -896,13 +896,11 @@ class SceneState():
     def __init__(self, scene: Scene, ignore: list[Mobject] | None = None):
         self.time = scene.time
         self.num_plays = scene.num_plays
-        self.mobjects_to_copies = OrderedDict.fromkeys(scene.mobjects)
-        if ignore:
-            for mob in ignore:
-                self.mobjects_to_copies.pop(mob, None)
-
+        self.mobjects_to_copies: OrderedDict[Mobject, Mobject] = OrderedDict()
         last_m2c = scene.undo_stack[-1].mobjects_to_copies if scene.undo_stack else dict()
-        for mob in self.mobjects_to_copies:
+        for mob in scene.mobjects:
+            if ignore and mob in ignore:
+                continue
             # If it hasn't changed since the last state, just point to the
             # same copy as before
             if mob in last_m2c and self.looks_identical(last_m2c[mob], mob):
